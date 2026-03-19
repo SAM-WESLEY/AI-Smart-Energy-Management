@@ -1,0 +1,4 @@
+{
+  "email": {"enabled": false, "sender": "your@gmail.com", "password": "app_password", "recipient": "alert@email.com"},
+  "twilio": {"enabled": false, "account_sid": "sid", "auth_token": "token", "from_number": "+1234567890", "to_number": "+0987654321"}
+}

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Smart Energy Management</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <h1>⚡ AI Smart Energy Management</h1>
+    <p>Real-Time IoT Energy Monitoring & AI Optimization</p>
+  </div>
+  <div class="header-right">
+    <span id="alert-badge" class="alert-badge normal">● NORMAL</span>
+    <span id="anomaly-badge" class="alert-badge" style="display:none;background:#422006;color:#f97316;border:1px solid #f97316;">⚠ ANOMALY</span>
+    <span id="last-updated" class="updated">—</span>
+    <button onclick="simulate()" class="sim-btn">⚡ Simulate</button>
+  </div>
+</header>
+<div class="vitals-grid">
+  <div class="vital-card yellow"><div class="vital-icon">⚡</div><div class="vital-label">Voltage</div><div class="vital-value" id="voltage">--</div><div class="vital-unit">V</div></div>
+  <div class="vital-card red"><div class="vital-icon">🔌</div><div class="vital-label">Current</div><div class="vital-value" id="current">--</div><div class="vital-unit">A</div></div>
+  <div class="vital-card orange"><div class="vital-icon">💡</div><div class="vital-label">Power</div><div class="vital-value" id="power">--</div><div class="vital-unit">W</div><div class="vital-bar-wrap"><div class="vital-bar" id="power-bar"></div></div></div>
+  <div class="vital-card green"><div class="vital-icon">🔋</div><div class="vital-label">Energy</div><div class="vital-value" id="energy">--</div><div class="vital-unit">kWh</div></div>
+  <div class="vital-card blue"><div class="vital-icon">📊</div><div class="vital-label">Power Factor</div><div class="vital-value" id="pf">--</div><div class="vital-unit">PF</div></div>
+  <div class="vital-card purple"><div class="vital-icon">🤖</div><div class="vital-label">Next Hour</div><div class="vital-value" id="prediction">--</div><div class="vital-unit">W (predicted)</div></div>
+</div>
+<div class="cost-grid">
+  <div class="cost-card"><div class="cost-label">💰 Cost Today</div><div class="cost-value" id="cost-today">₹ --</div></div>
+  <div class="cost-card"><div class="cost-label">📅 Monthly Estimate</div><div class="cost-value" id="cost-month">₹ --</div></div>
+  <div class="cost-card"><div class="cost-label">🔌 Relay Status</div><div class="cost-value" id="relay-status">--</div><div style="margin-top:8px;display:flex;gap:8px;justify-content:center;"><button class="relay-btn on" onclick="setRelay('on')">ON</button><button class="relay-btn off" onclick="setRelay('off')">OFF</button></div></div>
+</div>
+<div class="charts-grid">
+  <div class="chart-box"><h3>💡 Power (W) History</h3><canvas id="powerChart" height="90"></canvas></div>
+  <div class="chart-box"><h3>⚡ Voltage (V) History</h3><canvas id="voltageChart" height="90"></canvas></div>
+  <div class="chart-box"><h3>💰 Cost (₹) History</h3><canvas id="costChart" height="90"></canvas></div>
+</div>
+<footer>AI Smart Energy Management System | Sam Wesley S | Karunya Institute of Technology and Sciences</footer>
+<script>
+const mkChart=(id,label,color,min,max)=>new Chart(document.getElementById(id).getContext("2d"),{type:"line",data:{labels:[],datasets:[{label,data:[],borderColor:color,backgroundColor:color+"22",borderWidth:2,tension:0.4,fill:true,pointRadius:2}]},options:{responsive:true,animation:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#475569",maxTicksLimit:8},grid:{color:"#1e3a6e"}},y:{ticks:{color:"#475569"},grid:{color:"#1e3a6e"},min,max}}}});
+const powerChart=mkChart("powerChart","W","#f97316",0,4000);
+const voltageChart=mkChart("voltageChart","V","#eab308",200,250);
+const costChart=mkChart("costChart","₹","#22c55e",0,null);
+const ALERT_COLORS={"NORMAL":["normal","● NORMAL"],"WARNING":["warning","● WARNING"],"HIGH":["high","● HIGH"],"CRITICAL":["critical","● CRITICAL"]};
+function addPt(c,t,v){c.data.labels.push(t);c.data.datasets[0].data.push(v);if(c.data.labels.length>30){c.data.labels.shift();c.data.datasets[0].data.shift();}c.update();}
+function updateUI(d){
+  document.getElementById("voltage").textContent=d.voltage;
+  document.getElementById("current").textContent=d.current;
+  document.getElementById("power").textContent=d.power;
+  document.getElementById("energy").textContent=d.energy_kwh;
+  document.getElementById("pf").textContent=d.power_factor;
+  document.getElementById("prediction").textContent=d.prediction_1h;
+  document.getElementById("cost-today").textContent="₹ "+d.cost_today;
+  document.getElementById("cost-month").textContent="₹ "+d.cost_month;
+  document.getElementById("relay-status").textContent=d.relay_state?"🟢 ON":"🔴 OFF";
+  document.getElementById("last-updated").textContent="Updated: "+d.last_updated;
+  const pBar=document.getElementById("power-bar");
+  pBar.style.width=Math.min(100,d.power/40)+"%";
+  pBar.style.background=d.alert_level==="CRITICAL"?"#ef4444":d.alert_level==="HIGH"?"#f97316":d.alert_level==="WARNING"?"#eab308":"#22c55e";
+  const[cls,txt]=ALERT_COLORS[d.alert_level]||["normal","● NORMAL"];
+  const badge=document.getElementById("alert-badge");badge.textContent=txt;badge.className="alert-badge "+cls;
+  document.getElementById("anomaly-badge").style.display=d.anomaly?"inline-block":"none";
+  const t=d.last_updated;addPt(powerChart,t,d.power);addPt(voltageChart,t,d.voltage);addPt(costChart,t,d.cost_today);
+}
+function setRelay(a){fetch("/relay/"+a,{method:"POST"}).then(r=>r.json()).then(d=>{document.getElementById("relay-status").textContent=d.relay?"🟢 ON":"🔴 OFF";});}
+function simulate(){fetch("/simulate").then(r=>r.json()).then(d=>updateUI(d.data));}
+function poll(){fetch("/status").then(r=>r.json()).then(updateUI).catch(()=>{});}
+setInterval(poll,5000);poll();
+</script>
+</body>
+</html>
